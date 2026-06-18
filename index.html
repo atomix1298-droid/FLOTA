@@ -14,12 +14,14 @@
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .vehicle-card { border-top: 4px solid #2980b9; }
         .driver-card { border-top: 4px solid #9b59b6; }
+        .finance-card { border-top: 4px solid #27ae60; }
         
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
         .tab-btn { background-color: #bdc3c7; color: #333; padding: 12px 25px; border-radius: 6px; font-size: 16px; font-weight: bold; border: none; cursor: pointer; flex: 1; transition: 0.2s; }
         .tab-btn.active { color: white; }
         .tab-btn.fleet-tab.active { background-color: #2980b9; }
         .tab-btn.drivers-tab.active { background-color: #9b59b6; }
+        .tab-btn.finance-tab.active { background-color: #27ae60; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
@@ -47,6 +49,8 @@
         .badge-success { background-color: #2ecc71; color: white; }
         
         .config-box { background: #e8f4f8; border-left: 5px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        .backup-box { background: #fcf3cf; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        .alert-box { background: #fadbd8; border-left: 5px solid #e74c3c; padding: 15px; margin-bottom: 20px; border-radius: 4px; color: #78281f; font-weight: bold; display: none; }
         .service-box { background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; margin-top: 15px; border-radius: 6px; }
         .repair-list { font-size: 13px; margin-top: 10px; padding-left: 20px; }
     </style>
@@ -56,6 +60,20 @@
 <div class="container">
     <h1>🚛 Panel Dowodzenia - Firma Transportowa</h1>
     
+    <!-- AUTOMATYCZNE PRZYPOMNIENIA URZĘDOWE -->
+    <div id="gitd-alert" class="alert-box">
+        📅 UWAGA Urzędowa! Mamy początek roku. Pamiętaj o zgłoszeniu nowych kierowców lub zmian zatrudnienia do organu, który wydał licencję transportową (GITD lub Starostwo)!
+    </div>
+
+    <!-- SZEFIE, TUTAJ JEST TWOJA KOPIA ZAPASOWA -->
+    <div class="backup-box">
+        <h3>💾 Bezpieczeństwo i Kopia Zapasowa Danych</h3>
+        <p style="font-size: 13px; margin: 0 0 10px 0;">Zapisuj kopię na dysku komputera raz na jakiś czas. W razie awarii sprzętu pozwoli to przywrócić wszystkie dane i historię napraw jednym kliknięciem.</p>
+        <button type="button" class="btn-success" onclick="exportData()" style="background-color: #d35400;">📥 Pobierz kopię zapasową (Plik)</button>
+        <button type="button" class="btn-primary" onclick="document.getElementById('import-file').click()" style="background-color: #2c3e50;">📤 Wgraj kopię zapasową z pliku</button>
+        <input type="file" id="import-file" style="display: none;" onchange="importData(event)">
+    </div>
+
     <!-- KONFIGURACJA MAILA -->
     <div class="config-box">
         <h3>📧 Ustawienia powiadomień e-mail (EmailJS)</h3>
@@ -80,6 +98,7 @@
     <div class="tabs">
         <button class="tab-btn fleet-tab active" onclick="switchTab('fleet')">🚛 FLOTA (Ciężarówki & Serwis)</button>
         <button class="tab-btn drivers-tab" onclick="switchTab('drivers')">🪪 KIEROWCY (Dokumenty i Umowy)</button>
+        <button class="tab-btn finance-tab" onclick="switchTab('finance')">💰 FINANSE / FIRMA (Licencje & Polisy)</button>
     </div>
 
     <!-- ZAKŁADKA 1: FLOTA -->
@@ -102,6 +121,7 @@
                             <option value="Ubezpieczenie OC">Ubezpieczenie OC</option>
                             <option value="Badanie UDT">Badanie UDT</option>
                             <option value="Legalizacja Tacho">Legalizacja Tacho</option>
+                            <option value="Gaśnica / BHP">Gaśnica / BHP</option>
                         </select>
                     </div>
                     <div>
@@ -147,6 +167,40 @@
             </form>
         </div>
     </div>
+
+    <!-- ZAKŁADKA 3: FINANSE / FIRMA -->
+    <div id="finance-section" class="tab-content">
+        <div class="card finance-card">
+            <h2>💰 Ważne Terminy Firmowe (Licencje, Zabezpieczenia, Polisy)</h2>
+            <div style="overflow-x:auto;">
+                <table id="finance-table">
+                    <thead>
+                        <tr><th>Nazwa dokumentu / zobowiązania</th><th>Data ważności</th><th>Dni</th><th>Status</th><th>Akcje</th></tr>
+                    </thead>
+                    <tbody id="finance-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 id="finance-form-title">Dodaj lub Edytuj termin firmowy</h2>
+            <form id="finance-form">
+                <input type="hidden" id="finance-edit-id">
+                <div class="form-grid">
+                    <div>
+                        <label for="fin-name">Nazwa opłaty/dokumentu</label>
+                        <input type="text" id="fin-name" placeholder="np. Licencja Krajowa / OCP Przewoźnika" required>
+                    </div>
+                    <div>
+                        <label for="fin-date">Data ważności / płatności</label>
+                        <input type="date" id="fin-date" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-success" id="finance-submit-btn" style="background-color: #27ae60;">Zapisz termin firmowy</button>
+                <button type="button" id="finance-cancel-btn" style="background-color: #7f8c8d; display: none;" onclick="cancelFinanceEdit()">Anuluj</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -173,38 +227,35 @@
         { id: 19, plate: "Man Tgl ETM 28614", type: "Badanie UDT", date: "2026-05-31" }
     ];
 
-    // NOWA ZAKTUALIZOWANA BAZA KIEROWCÓW
     const initialDriversData = [
-        // Ivan
         { id: 201, name: "Ivan", type: "Umowa o pracę / zlecenie", date: "2026-12-31" },
-        // Kamil Piekarski
         { id: 202, name: "Kamil Piekarski", type: "Umowa o pracę / zlecenie", date: "2027-05-09" },
         { id: 203, name: "Kamil Piekarski", type: "Prawo jazdy / Kod 95", date: "2028-08-30" },
         { id: 204, name: "Kamil Piekarski", type: "Karta kierowcy", date: "2029-03-28" },
-        // Jarek Pawłowski
         { id: 205, name: "Jarek Pawłowski", type: "Umowa o pracę / zlecenie", date: "2027-05-26" },
         { id: 206, name: "Jarek Pawłowski", type: "Prawo jazdy / Kod 95", date: "2029-08-13" },
-        // Tomasz Głębocki
         { id: 207, name: "Tomasz Głębocki", type: "Umowa o pracę / zlecenie", date: "2026-10-20" },
         { id: 208, name: "Tomasz Głębocki", type: "Prawo jazdy / Kod 95", date: "2029-03-19" },
         { id: 209, name: "Tomasz Głębocki", type: "Karta kierowcy", date: "2027-03-10" },
-        // Leszek Rychert
         { id: 210, name: "Leszek Rychert", type: "Umowa o pracę / zlecenie", date: "2026-07-26" },
         { id: 211, name: "Leszek Rychert", type: "Prawo jazdy / Kod 95", date: "2039-10-29" },
         { id: 212, name: "Leszek Rychert", type: "Karta kierowcy", date: "2031-03-31" }
     ];
 
-    // Nadpisz LocalStorage nowymi danymi startowymi kierowców, jeśli baza była pusta lub stara
+    const initialFinanceData = [
+        { id: 301, name: "Ubezpieczenie OCP Przewoźnika", date: "2027-02-15" },
+        { id: 302, name: "Zabezpieczenie finansowe do licencji (GITD)", date: "2027-04-30" }
+    ];
+
+    // Inicjalizacja LocalStorage
     if (!localStorage.getItem('fleetData')) localStorage.setItem('fleetData', JSON.stringify(initialFleetData));
-    
-    // Zawsze wymuszamy nowe dane jeśli wykryto starą, mniejszą listę startową kierowców
-    if (!localStorage.getItem('driversData') || JSON.parse(localStorage.getItem('driversData')).length <= 2) {
-        localStorage.setItem('driversData', JSON.stringify(initialDriversData));
-    }
+    if (!localStorage.getItem('driversData')) localStorage.setItem('driversData', JSON.stringify(initialDriversData));
+    if (!localStorage.getItem('financeData')) localStorage.setItem('financeData', JSON.stringify(initialFinanceData));
     if (!localStorage.getItem('serviceData')) localStorage.setItem('serviceData', JSON.stringify({}));
 
     let fleetData = JSON.parse(localStorage.getItem('fleetData'));
     let driversData = JSON.parse(localStorage.getItem('driversData'));
+    let financeData = JSON.parse(localStorage.getItem('financeData'));
     let serviceData = JSON.parse(localStorage.getItem('serviceData'));
 
     document.getElementById('emailjs-public').value = localStorage.getItem('el_pub') || '';
@@ -217,9 +268,12 @@
         if(tab === 'fleet') {
             document.querySelector('.fleet-tab').classList.add('active');
             document.getElementById('fleet-section').classList.add('active');
-        } else {
+        } else if(tab === 'drivers') {
             document.querySelector('.drivers-tab').classList.add('active');
             document.getElementById('drivers-section').classList.add('active');
+        } else {
+            document.querySelector('.finance-tab').classList.add('active');
+            document.getElementById('finance-section').classList.add('active');
         }
     }
 
@@ -227,6 +281,42 @@
         localStorage.setItem('el_pub', document.getElementById('emailjs-public').value);
         localStorage.setItem('el_srv', document.getElementById('emailjs-service').value);
         localStorage.setItem('el_tmp', document.getElementById('emailjs-template').value);
+    }
+
+    // --- FUNKCJA WYLICZANIA PRZEBIEGU URZĘDOWO-WIRTUALNEGO (KILOMETRY OLEJU) ---
+    function calculateVirtualMileage(sData) {
+        if (!sData.mileage || !sData.saveDate) return { current: null, oilLeft: null };
+        
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const saveDate = new Date(sData.saveDate);
+        
+        let daysDiff = Math.floor((today - saveDate) / (1000 * 60 * 60 * 24));
+        if (daysDiff < 0) daysDiff = 0;
+
+        let addedKm = 0;
+        const dailyKm = Number(sData.dailyKm) || 0;
+
+        if (sData.workDaysOnly) {
+            let tempDate = new Date(saveDate);
+            for (let i = 0; i < daysDiff; i++) {
+                tempDate.setDate(tempDate.getDate() + 1);
+                if (tempDate.getDay() !== 0 && tempDate.getDay() !== 6) {
+                    addedKm += dailyKm;
+                }
+            }
+        } else {
+            addedKm = daysDiff * dailyKm;
+        }
+
+        const calculatedCurrent = Number(sData.mileage) + addedKm;
+        let oilLeft = null;
+        if (sData.oilMileage) {
+            const kmSinceOil = calculatedCurrent - Number(sData.oilMileage);
+            oilLeft = 40000 - kmSinceOil;
+        }
+
+        return { current: Math.round(calculatedCurrent), oilLeft: oilLeft ? Math.round(oilLeft) : null };
     }
 
     // --- LOGIKA POJAZDÓW ---
@@ -278,13 +368,20 @@
         }
     }
 
-    // --- EKPLOATACJA I SERWIS ---
+    // --- EKSPLOATACJA I SERWIS ---
     function saveService(plate) {
-        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', repairs: [] };
+        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', oilMileage: '', dailyKm: '200', workDaysOnly: true, saveDate: '', repairs: [] };
+        
         serviceData[plate].mileage = document.getElementById(`mileage-${plate}`).value;
         serviceData[plate].oilDate = document.getElementById(`oil-${plate}`).value;
+        serviceData[plate].oilMileage = document.getElementById(`oil-mil-${plate}`).value;
+        serviceData[plate].dailyKm = document.getElementById(`daily-km-${plate}`).value;
+        serviceData[plate].workDaysOnly = document.getElementById(`workdays-${plate}`).checked;
+        serviceData[plate].saveDate = new Date().toISOString().split('T')[0];
+
         localStorage.setItem('serviceData', JSON.stringify(serviceData));
-        alert("Zapisano przebieg i olej dla " + plate);
+        alert("Zapisano konfigurację eksploatacyjną dla " + plate + ". Przebieg będzie rósł automatycznie.");
+        renderTables();
     }
 
     function addRepair(plate) {
@@ -294,7 +391,7 @@
 
         if(!date || !desc) { alert("Wpisz datę i opis naprawy!"); return; }
 
-        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', repairs: [] };
+        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', oilMileage: '', dailyKm: '200', workDaysOnly: true, saveDate: '', repairs: [] };
         serviceData[plate].repairs.push({ date, mileage, desc });
         localStorage.setItem('serviceData', JSON.stringify(serviceData));
         
@@ -353,10 +450,62 @@
         }
     }
 
+    // --- LOGIKA FINANSÓW / FIRMY ---
+    document.getElementById('finance-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const editId = document.getElementById('finance-edit-id').value;
+        const name = document.getElementById('fin-name').value.trim();
+        const date = document.getElementById('fin-date').value;
+
+        if (editId) {
+            financeData = financeData.map(item => item.id == editId ? {id: Number(editId), name, date} : item);
+            cancelFinanceEdit();
+        } else {
+            financeData.push({ id: Date.now(), name, date });
+        }
+        localStorage.setItem('financeData', JSON.stringify(financeData));
+        document.getElementById('finance-form').reset();
+        renderTables();
+    });
+
+    function editFinance(id) {
+        const item = financeData.find(i => i.id === id);
+        if(item) {
+            document.getElementById('finance-edit-id').value = item.id;
+            document.getElementById('fin-name').value = item.name;
+            document.getElementById('fin-date').value = item.date;
+            document.getElementById('finance-form-title').innerText = "✏️ Edycja opłaty: " + item.name;
+            document.getElementById('finance-submit-btn').innerText = "Zapisz zmiany";
+            document.getElementById('finance-cancel-btn').style.display = "inline-block";
+            document.getElementById('finance-form').scrollIntoView({behavior: 'smooth'});
+        }
+    }
+
+    function cancelFinanceEdit() {
+        document.getElementById('finance-edit-id').value = "";
+        document.getElementById('finance-form').reset();
+        document.getElementById('finance-form-title').innerText = "Dodaj lub Edytuj termin firmowy";
+        document.getElementById('finance-submit-btn').innerText = "Zapisz termin firmowy";
+        document.getElementById('finance-cancel-btn').style.display = "none";
+    }
+
+    function deleteFinance(id) {
+        if(confirm("Usunąć to zobowiązanie?")) {
+            financeData = financeData.filter(item => item.id !== id);
+            localStorage.setItem('financeData', JSON.stringify(financeData));
+            renderTables();
+        }
+    }
+
     // --- RENDEROWANIE PANELI ---
     function renderTables() {
         const today = new Date();
         today.setHours(0,0,0,0);
+
+        // Pokazywanie powiadomienia GITD na początku roku (Styczeń = miesiąc 0, Luty = miesiąc 1)
+        if(today.getMonth() === 0 || today.getMonth() === 1) {
+            document.getElementById('gitd-alert').style.display = 'block';
+        }
 
         // 1. Renderowanie Floty i Serwisu
         const fleetContainer = document.getElementById('vehicles-container');
@@ -370,12 +519,27 @@
         Object.keys(fleetGroups).sort().forEach(plate => {
             const items = fleetGroups[plate];
             items.sort((a,b) => new Date(a.date) - new Date(b.date));
-            const sData = serviceData[plate] || { mileage: '', oilDate: '', repairs: [] };
+            const sData = serviceData[plate] || { mileage: '', oilDate: '', oilMileage: '', dailyKm: '200', workDaysOnly: true, saveDate: '', repairs: [] };
+            
+            const vData = calculateVirtualMileage(sData);
 
             const card = document.createElement('div');
             card.className = 'card vehicle-card';
             
-            let html = `<h2>🚚 Pojazd: ${plate}</h2>
+            let html = `<h2>🚚 Pojazd: ${plate}</h2>`;
+            
+            // System powiadomień o wymianie oleju
+            if (vData.oilLeft !== null) {
+                if (vData.oilLeft <= 0) {
+                    html += `<div style="background:#f2d7d5; border: 2px solid #c0392b; padding:10px; margin-bottom:10px; border-radius:5px; color:#922b21; font-weight:bold;">🚨 KRYTYCZNA WYMIANA OLEJU! Przekroczono limit 40 000 km o: ${Math.abs(vData.oilLeft)} km!</div>`;
+                } else if (vData.oilLeft <= 3000) {
+                    html += `<div style="background:#fcf3cf; border: 2px solid #f39c12; padding:10px; margin-bottom:10px; border-radius:5px; color:#b9770e; font-weight:bold;">⚠️ ZBLIŻA SIĘ WYMIANA OLEJU! Zostało tylko: ${vData.oilLeft} km do 40 tysięcy.</div>`;
+                } else {
+                    html += `<div style="background:#d4efdf; border: 1px solid #27ae60; padding:8px; margin-bottom:10px; border-radius:5px; color:#1e8449; font-size:13px;">✅ Olej OK. Szacunkowo zostało jeszcze: <strong>${vData.oilLeft} km</strong> do wymiany.</div>`;
+                }
+            }
+
+            html += `
             <div style="overflow-x:auto;">
                 <table>
                     <thead><tr><th>Rodzaj badania</th><th>Data ważności</th><th>Dni</th><th>Status</th><th>Akcje</th></tr></thead>
@@ -396,20 +560,31 @@
             // HTML Sekcji eksploatacyjnej
             html += `
             <div class="service-box">
-                <h4>🔧 Stan techniczny i Eksploatacja</h4>
+                <h4>🔧 Stan techniczny i Automatyczny kalkulator oleju</h4>
                 <div class="form-grid">
                     <div>
-                        <label>Aktualny przebieg (km)</label>
-                        <input type="number" id="mileage-${plate}" value="${sData.mileage || ''}" placeholder="np. 420000">
+                        <label>Stan licznika w dniu zapisu (km)</label>
+                        <input type="number" id="mileage-${plate}" value="${sData.mileage || ''}" placeholder="Zapisany bazowy stan">
+                        ${vData.current ? `<span style="font-size:11px;color:#566573;">Aktualny wyliczony: <strong>${vData.current} km</strong></span>` : ''}
                     </div>
                     <div>
-                        <label>Ostatnia wymiana oleju</label>
+                        <label>Przebieg przy ost. oleju (km)</label>
+                        <input type="number" id="oil-mil-${plate}" value="${sData.oilMileage || ''}" placeholder="np. 380000">
+                    </div>
+                    <div>
+                        <label>Dzienna norma kilometrów</label>
+                        <input type="number" id="daily-km-${plate}" value="${sData.dailyKm || '200'}">
+                    </div>
+                    <div>
+                        <label style="margin-bottom:12px;">Dni robocze</label>
+                        <label style="font-weight:normal; font-size:13px;"><input type="checkbox" id="workdays-${plate}" ${sData.workDaysOnly ? 'checked' : ''}> Tylko pon-pt</label>
+                    </div>
+                    <div>
+                        <label>Ostatnia zmiana oleju (Data)</label>
                         <input type="date" id="oil-${plate}" value="${sData.oilDate || ''}">
                     </div>
-                    <div style="display:flex; align-items:flex-end;">
-                        <button type="button" class="btn-primary" onclick="saveService('${plate}')">💾 Zapisz stan</button>
-                    </div>
                 </div>
+                <button type="button" class="btn-primary" onclick="saveService('${plate}')" style="margin-bottom:15px; background-color:#34495e;">💾 Zapisz konfigurację i Przebieg</button>
                 
                 <h5 style="margin: 15px 0 5px 0;">🛠️ Zgłoś nową naprawę / serwis:</h5>
                 <div class="form-grid">
@@ -459,6 +634,75 @@
             card.innerHTML = html;
             driversContainer.appendChild(card);
         });
+
+        // 3. Renderowanie Finansów
+        const financeTbody = document.getElementById('finance-tbody');
+        financeTbody.innerHTML = '';
+        financeData.sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        financeData.forEach(item => {
+            const diffDays = Math.ceil((new Date(item.date) - today) / (1000 * 60 * 60 * 24));
+            let badge = '';
+            if (diffDays < 0) badge = `<span class="badge badge-danger">PO TERMINIE! (${Math.abs(diffDays)})</span>`;
+            else if (diffDays <= 7) badge = `<span class="badge badge-danger">KRYTYCZNIE! (${diffDays} dni)</span>`;
+            else if (diffDays <= 30) badge = `<span class="badge badge-warning">Ostrzeżenie (${diffDays} dni)</span>`;
+            else badge = `<span class="badge badge-success">OK (${diffDays})</span>`;
+
+            financeTbody.innerHTML += `<tr>
+                <td><strong>${item.name}</strong></td>
+                <td>${item.date}</td>
+                <td>${diffDays < 0 ? '---' : diffDays}</td>
+                <td>${badge}</td>
+                <td>
+                    <button class="btn-edit" onclick="editFinance(${item.id})">Edytuj</button>
+                    <button class="btn-delete" onclick="deleteFinance(${item.id})">Usuń</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    // --- SYSTEM KOPII ZAPASOWYCH (EXPORT / IMPORT PLIKU JSON) ---
+    function exportData() {
+        const fullBackup = {
+            fleetData: JSON.parse(localStorage.getItem('fleetData')),
+            driversData: JSON.parse(localStorage.getItem('driversData')),
+            financeData: JSON.parse(localStorage.getItem('financeData')),
+            serviceData: JSON.parse(localStorage.getItem('serviceData')),
+            el_pub: localStorage.getItem('el_pub'),
+            el_srv: localStorage.getItem('el_srv'),
+            el_tmp: localStorage.getItem('el_tmp')
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `KOPIA_FLOTA_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (imported.fleetData) localStorage.setItem('fleetData', JSON.stringify(imported.fleetData));
+                if (imported.driversData) localStorage.setItem('driversData', JSON.stringify(imported.driversData));
+                if (imported.financeData) localStorage.setItem('financeData', JSON.stringify(imported.financeData));
+                if (imported.serviceData) localStorage.setItem('serviceData', JSON.stringify(imported.serviceData));
+                if (imported.el_pub) localStorage.setItem('el_pub', imported.el_pub);
+                if (imported.el_srv) localStorage.setItem('el_srv', imported.el_srv);
+                if (imported.el_tmp) localStorage.setItem('el_tmp', imported.el_tmp);
+                
+                alert("🚀 Kopia zapasowa wgrana pomyślnie! Strona za chwilę się odświeży.");
+                window.location.reload();
+            } catch (err) {
+                alert("❌ Błąd! Wybrałeś nieprawidłowy plik kopii zapasowej.");
+            }
+        };
+        reader.readAsText(file);
     }
 
     // --- ALERTY E-MAIL ---
@@ -471,19 +715,32 @@
             if (!item.date) return;
             const diffDays = Math.ceil((new Date(item.date) - today) / (1000 * 60 * 60 * 24));
             if (diffDays < 0) {
-                alerts.push(`🚨 ALARM! PO TERMINIE: [${label}] ${name} -> ${item.type} minęło o ${Math.abs(diffDays)} dni! (${item.date})`);
+                alerts.push(`🚨 ALARM! PO TERMINIE: [${label}] ${name} -> ${item.type || ''} minęło o ${Math.abs(diffDays)} dni! (${item.date})`);
             } else if (diffDays <= 7) {
-                alerts.push(`⚠️ PILNE (7 DNI): [${label}] ${name} -> ${item.type} kończy się za ${diffDays} dni!! (${item.date})`);
+                alerts.push(`⚠️ PILNE (7 DNI): [${label}] ${name} -> ${item.type || ''} kończy się za ${diffDays} dni!! (${item.date})`);
             } else if (diffDays <= 30) {
-                alerts.push(`ℹ️ OSTRZEŻENIE (30 DNI): [${label}] ${name} -> ${item.type} kończy się za ${diffDays} dni. (${item.date})`);
+                alerts.push(`ℹ️ OSTRZEŻENIE (30 DNI): [${label}] ${name} -> ${item.type || ''} kończy się za ${diffDays} dni. (${item.date})`);
             }
         }
 
         fleetData.forEach(item => processItem(item, "FLOTA", item.plate));
         driversData.forEach(item => processItem(item, "KIEROWCY", item.name));
+        financeData.forEach(item => processItem(item, "FINANSE", item.name));
+
+        // Dodanie alertów o olejach do maila
+        Object.keys(serviceData).forEach(plate => {
+            const vData = calculateVirtualMileage(serviceData[plate]);
+            if (vData.oilLeft !== null) {
+                if (vData.oilLeft <= 0) {
+                    alerts.push(`🚨 ALARM OLEJ! Pojazd ${plate} przekroczył granicę wymiany oleju o ${Math.abs(vData.oilLeft)} km!`);
+                } else if (vData.oilLeft <= 3000) {
+                    alerts.push(`⚠️ OLEJ BLISKO! Pojazd ${plate} - zostało tylko ${vData.oilLeft} km do wymiany oleju.`);
+                }
+            }
+        });
 
         if (alerts.length > 0) {
-            if(!forceEmail) alert("⚠️ Wykryto zbliżające się terminy ważności (30 lub 7 dni). Sprawdź szczegóły.");
+            if(!forceEmail) alert("⚠️ Wykryto zbliżające się terminy ważności lub wymiany oleju. Sprawdź szczegóły.");
 
             const pubKey = localStorage.getItem('el_pub');
             const srvId = localStorage.getItem('el_srv');
@@ -495,7 +752,7 @@
                     message: alerts.join("\n"),
                     to_email: "atomix1298@gmail.com"
                 }).then(() => {
-                    alert("📧 Raport o terminach (30 / 7 dni) wysłany na atomix1298@gmail.com!");
+                    alert("📧 Raport o terminach wysłany na atomix1298@gmail.com!");
                 }, (err) => {
                     alert("❌ Błąd maila: " + JSON.stringify(err));
                 });
