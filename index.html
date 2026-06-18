@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zarządzanie Flotą i Kierowcami - Serwis</title>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1, h2, h3, h4 { color: #2c3e50; margin-top: 0; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .vehicle-card { border-top: 4px solid #2980b9; }
+        .driver-card { border-top: 4px solid #9b59b6; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { background-color: #bdc3c7; color: #333; padding: 12px 25px; border-radius: 6px; font-size: 16px; font-weight: bold; border: none; cursor: pointer; flex: 1; transition: 0.2s; }
+        .tab-btn.active { color: white; }
+        .tab-btn.fleet-tab.active { background-color: #2980b9; }
+        .tab-btn.drivers-tab.active { background-color: #9b59b6; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        
+        button { color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .btn-success { background-color: #27ae60; }
+        .btn-success:hover { background-color: #219653; }
+        .btn-primary { background-color: #2980b9; }
+        .btn-primary:hover { background-color: #1f618d; }
+        .btn-delete { background-color: #c0392b; padding: 5px 10px; font-size: 12px; }
+        .btn-delete:hover { background-color: #962d22; }
+        .btn-edit { background-color: #f39c12; padding: 5px 10px; font-size: 12px; margin-right: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; margin-bottom: 10px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
+        th { background-color: #34495e; color: white; font-weight: 600; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-block; }
+        .badge-danger { background-color: #e74c3c; color: white; }
+        .badge-warning { background-color: #f39c12; color: white; }
+        .badge-info { background-color: #3498db; color: white; }
+        .badge-success { background-color: #2ecc71; color: white; }
+        
+        .config-box { background: #e8f4f8; border-left: 5px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        .service-box { background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; margin-top: 15px; border-radius: 6px; }
+        .repair-list { font-size: 13px; margin-top: 10px; padding-left: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚛 Panel Dowodzenia - Firma Transportowa</h1>
+    
+    <!-- KONFIGURACJA MAILA -->
+    <div class="config-box">
+        <h3>📧 Ustawienia powiadomień e-mail (EmailJS)</h3>
+        <div class="form-grid">
+            <div>
+                <label>Public Key</label>
+                <input type="text" id="emailjs-public" placeholder="user_XXXXXX" onchange="saveConfig()">
+            </div>
+            <div>
+                <label>Service ID</label>
+                <input type="text" id="emailjs-service" placeholder="service_XXXXXX" onchange="saveConfig()">
+            </div>
+            <div>
+                <label>Template ID</label>
+                <input type="text" id="emailjs-template" placeholder="template_XXXXXX" onchange="saveConfig()">
+            </div>
+        </div>
+        <button type="button" class="btn-primary" onclick="checkAlerts(true)">📧 Wyślij zbiorczy raport na e-mail</button>
+    </div>
+
+    <!-- NAWIGACJA ZAKŁADEK -->
+    <div class="tabs">
+        <button class="tab-btn fleet-tab active" onclick="switchTab('fleet')">🚛 FLOTA (Ciężarówki & Serwis)</button>
+        <button class="tab-btn drivers-tab" onclick="switchTab('drivers')">🪪 KIEROWCY (Dokumenty i Umowy)</button>
+    </div>
+
+    <!-- ZAKŁADKA 1: FLOTA -->
+    <div id="fleet-section" class="tab-content active">
+        <div id="vehicles-container"></div>
+
+        <div class="card" style="margin-top: 30px;">
+            <h2 id="fleet-form-title">Dodaj lub Edytuj termin pojazdu</h2>
+            <form id="vehicle-form">
+                <input type="hidden" id="edit-id">
+                <div class="form-grid">
+                    <div>
+                        <label for="plate">Pojazd / Nr Rejestracyjny</label>
+                        <input type="text" id="plate" placeholder="np. Man Tgl GKA 63156" required>
+                    </div>
+                    <div>
+                        <label for="type">Rodzaj badania/serwisu</label>
+                        <select id="type" required>
+                            <option value="Przegląd rejestracyjny">Przegląd rejestracyjny</option>
+                            <option value="Ubezpieczenie OC">Ubezpieczenie OC</option>
+                            <option value="Badanie UDT">Badanie UDT</option>
+                            <option value="Legalizacja Tacho">Legalizacja Tacho</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="date">Data ważności</label>
+                        <input type="date" id="date" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-success" id="submit-btn">Zapisz pojazd</button>
+                <button type="button" id="cancel-edit-btn" style="background-color: #7f8c8d; display: none;" onclick="cancelEdit()">Anuluj</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ZAKŁADKA 2: KIEROWCY -->
+    <div id="drivers-section" class="tab-content">
+        <div id="drivers-container"></div>
+
+        <div class="card" style="margin-top: 30px;">
+            <h2 id="driver-form-title">Dodaj lub Edytuj termin kierowcy</h2>
+            <form id="driver-form">
+                <input type="hidden" id="driver-edit-id">
+                <div class="form-grid">
+                    <div>
+                        <label for="driver-name">Imię i Nazwisko kierowcy</label>
+                        <input type="text" id="driver-name" placeholder="np. Jan Kowalski" required>
+                    </div>
+                    <div>
+                        <label for="driver-type">Rodzaj dokumentu / umowy</label>
+                        <select id="driver-type" required>
+                            <option value="Umowa o pracę / zlecenie">Umowa o pracę / zlecenie</option>
+                            <option value="Badania lekarskie i psychotesty">Badania lekarskie i psychotesty</option>
+                            <option value="Prawo jazdy / Kod 95">Prawo jazdy / Kod 95</option>
+                            <option value="Karta kierowcy">Karta kierowcy</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="driver-date">Data ważności</label>
+                        <input type="date" id="driver-date" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-success" id="driver-submit-btn" style="background-color: #9b59b6;">Zapisz kierowcę</button>
+                <button type="button" id="driver-cancel-btn" style="background-color: #7f8c8d; display: none;" onclick="cancelDriverEdit()">Anuluj</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Bazy danych startowe pojazdów
+    const initialFleetData = [
+        { id: 1, plate: "Man Tgl GKA 63156", type: "Przegląd rejestracyjny", date: "2027-01-31" },
+        { id: 2, plate: "Man Tgl GKA 63156", type: "Ubezpieczenie OC", date: "2027-03-06" },
+        { id: 3, plate: "Man Tgl GKA 63156", type: "Badanie UDT", date: "2026-05-31" },
+        { id: 4, plate: "Man Tgl GKA 63156", type: "Legalizacja Tacho", date: "2028-02-27" },
+        { id: 5, plate: "Man Tgl Ezg24Y7", type: "Przegląd rejestracyjny", date: "2026-06-27" },
+        { id: 6, plate: "Man Tgl Ezg24Y7", type: "Ubezpieczenie OC", date: "2026-01-05" },
+        { id: 7, plate: "Man Tgl Ezg24Y7", type: "Legalizacja Tacho", date: "2027-03-28" },
+        { id: 8, plate: "Daf FA LF 45 NEL13K3", type: "Przegląd rejestracyjny", date: "2026-11-14" },
+        { id: 9, plate: "Daf FA LF 45 NEL13K3", type: "Ubezpieczenie OC", date: "2026-11-17" },
+        { id: 10, plate: "Daf FA LF 45 NEL13K3", type: "Badanie UDT", date: "2028-11-30" },
+        { id: 11, plate: "Daf FA LF 45 NEL13K3", type: "Legalizacja Tacho", date: "2028-04-01" },
+        { id: 12, plate: "Man Tgl GKA 94779", type: "Przegląd rejestracyjny", date: "2026-04-16" },
+        { id: 13, plate: "Man Tgl GKA 94779", type: "Ubezpieczenie OC", date: "2026-04-16" },
+        { id: 14, plate: "Man Tgl GKA 94779", type: "Badanie UDT", date: "2028-05-31" },
+        { id: 15, plate: "Man Tgl GKA 94779", type: "Legalizacja Tacho", date: "2026-04-18" },
+        { id: 16, plate: "Man Tgl ETM 28614", type: "Przegląd rejestracyjny", date: "2026-07-30" },
+        { id: 17, plate: "Man Tgl ETM 28614", type: "Ubezpieczenie OC", date: "2026-11-26" },
+        { id: 18, plate: "Man Tgl ETM 28614", type: "Legalizacja Tacho", date: "2028-05-07" },
+        { id: 19, plate: "Man Tgl ETM 28614", type: "Badanie UDT", date: "2026-05-31" }
+    ];
+
+    // NOWA ZAKTUALIZOWANA BAZA KIEROWCÓW
+    const initialDriversData = [
+        // Ivan
+        { id: 201, name: "Ivan", type: "Umowa o pracę / zlecenie", date: "2026-12-31" },
+        // Kamil Piekarski
+        { id: 202, name: "Kamil Piekarski", type: "Umowa o pracę / zlecenie", date: "2027-05-09" },
+        { id: 203, name: "Kamil Piekarski", type: "Prawo jazdy / Kod 95", date: "2028-08-30" },
+        { id: 204, name: "Kamil Piekarski", type: "Karta kierowcy", date: "2029-03-28" },
+        // Jarek Pawłowski
+        { id: 205, name: "Jarek Pawłowski", type: "Umowa o pracę / zlecenie", date: "2027-05-26" },
+        { id: 206, name: "Jarek Pawłowski", type: "Prawo jazdy / Kod 95", date: "2029-08-13" },
+        // Tomasz Głębocki
+        { id: 207, name: "Tomasz Głębocki", type: "Umowa o pracę / zlecenie", date: "2026-10-20" },
+        { id: 208, name: "Tomasz Głębocki", type: "Prawo jazdy / Kod 95", date: "2029-03-19" },
+        { id: 209, name: "Tomasz Głębocki", type: "Karta kierowcy", date: "2027-03-10" },
+        // Leszek Rychert
+        { id: 210, name: "Leszek Rychert", type: "Umowa o pracę / zlecenie", date: "2026-07-26" },
+        { id: 211, name: "Leszek Rychert", type: "Prawo jazdy / Kod 95", date: "2039-10-29" },
+        { id: 212, name: "Leszek Rychert", type: "Karta kierowcy", date: "2031-03-31" }
+    ];
+
+    // Nadpisz LocalStorage nowymi danymi startowymi kierowców, jeśli baza była pusta lub stara
+    if (!localStorage.getItem('fleetData')) localStorage.setItem('fleetData', JSON.stringify(initialFleetData));
+    
+    // Zawsze wymuszamy nowe dane jeśli wykryto starą, mniejszą listę startową kierowców
+    if (!localStorage.getItem('driversData') || JSON.parse(localStorage.getItem('driversData')).length <= 2) {
+        localStorage.setItem('driversData', JSON.stringify(initialDriversData));
+    }
+    if (!localStorage.getItem('serviceData')) localStorage.setItem('serviceData', JSON.stringify({}));
+
+    let fleetData = JSON.parse(localStorage.getItem('fleetData'));
+    let driversData = JSON.parse(localStorage.getItem('driversData'));
+    let serviceData = JSON.parse(localStorage.getItem('serviceData'));
+
+    document.getElementById('emailjs-public').value = localStorage.getItem('el_pub') || '';
+    document.getElementById('emailjs-service').value = localStorage.getItem('el_srv') || '';
+    document.getElementById('emailjs-template').value = localStorage.getItem('el_tmp') || '';
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        if(tab === 'fleet') {
+            document.querySelector('.fleet-tab').classList.add('active');
+            document.getElementById('fleet-section').classList.add('active');
+        } else {
+            document.querySelector('.drivers-tab').classList.add('active');
+            document.getElementById('drivers-section').classList.add('active');
+        }
+    }
+
+    function saveConfig() {
+        localStorage.setItem('el_pub', document.getElementById('emailjs-public').value);
+        localStorage.setItem('el_srv', document.getElementById('emailjs-service').value);
+        localStorage.setItem('el_tmp', document.getElementById('emailjs-template').value);
+    }
+
+    // --- LOGIKA POJAZDÓW ---
+    document.getElementById('vehicle-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const editId = document.getElementById('edit-id').value;
+        const plate = document.getElementById('plate').value.trim();
+        const type = document.getElementById('type').value;
+        const date = document.getElementById('date').value;
+
+        if (editId) {
+            fleetData = fleetData.map(item => item.id == editId ? {id: Number(editId), plate, type, date} : item);
+            cancelEdit();
+        } else {
+            fleetData.push({ id: Date.now(), plate, type, date });
+        }
+        localStorage.setItem('fleetData', JSON.stringify(fleetData));
+        document.getElementById('vehicle-form').reset();
+        renderTables();
+    });
+
+    function editItem(id) {
+        const item = fleetData.find(i => i.id === id);
+        if(item) {
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('plate').value = item.plate;
+            document.getElementById('type').value = item.type;
+            document.getElementById('date').value = item.date;
+            document.getElementById('fleet-form-title').innerText = "✏️ Edycja: " + item.plate;
+            document.getElementById('submit-btn').innerText = "Zapisz zmiany";
+            document.getElementById('cancel-edit-btn').style.display = "inline-block";
+            document.getElementById('vehicle-form').scrollIntoView({behavior: 'smooth'});
+        }
+    }
+
+    function cancelEdit() {
+        document.getElementById('edit-id').value = "";
+        document.getElementById('vehicle-form').reset();
+        document.getElementById('fleet-form-title').innerText = "Dodaj lub Edytuj termin pojazdu";
+        document.getElementById('submit-btn').innerText = "Zapisz pojazd";
+        document.getElementById('cancel-edit-btn').style.display = "none";
+    }
+
+    function deleteItem(id) {
+        if(confirm("Usunąć ten termin?")) {
+            fleetData = fleetData.filter(item => item.id !== id);
+            localStorage.setItem('fleetData', JSON.stringify(fleetData));
+            renderTables();
+        }
+    }
+
+    // --- EKPLOATACJA I SERWIS ---
+    function saveService(plate) {
+        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', repairs: [] };
+        serviceData[plate].mileage = document.getElementById(`mileage-${plate}`).value;
+        serviceData[plate].oilDate = document.getElementById(`oil-${plate}`).value;
+        localStorage.setItem('serviceData', JSON.stringify(serviceData));
+        alert("Zapisano przebieg i olej dla " + plate);
+    }
+
+    function addRepair(plate) {
+        const date = document.getElementById(`rep-date-${plate}`).value;
+        const mileage = document.getElementById(`rep-mil-${plate}`).value;
+        const desc = document.getElementById(`rep-desc-${plate}`).value.trim();
+
+        if(!date || !desc) { alert("Wpisz datę i opis naprawy!"); return; }
+
+        if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', repairs: [] };
+        serviceData[plate].repairs.push({ date, mileage, desc });
+        localStorage.setItem('serviceData', JSON.stringify(serviceData));
+        
+        document.getElementById(`rep-date-${plate}`).value = '';
+        document.getElementById(`rep-mil-${plate}`).value = '';
+        document.getElementById(`rep-desc-${plate}`).value = '';
+        renderTables();
+    }
+
+    // --- LOGIKA KIEROWCÓW ---
+    document.getElementById('driver-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const editId = document.getElementById('driver-edit-id').value;
+        const name = document.getElementById('driver-name').value.trim();
+        const type = document.getElementById('driver-type').value;
+        const date = document.getElementById('driver-date').value;
+
+        if (editId) {
+            driversData = driversData.map(item => item.id == editId ? {id: Number(editId), name, type, date} : item);
+            cancelDriverEdit();
+        } else {
+            driversData.push({ id: Date.now(), name, type, date });
+        }
+        localStorage.setItem('driversData', JSON.stringify(driversData));
+        document.getElementById('driver-form').reset();
+        renderTables();
+    });
+
+    function editDriver(id) {
+        const item = driversData.find(i => i.id === id);
+        if(item) {
+            document.getElementById('driver-edit-id').value = item.id;
+            document.getElementById('driver-name').value = item.name;
+            document.getElementById('driver-type').value = item.type;
+            document.getElementById('driver-date').value = item.date;
+            document.getElementById('driver-form-title').innerText = "✏️ Edycja: " + item.name;
+            document.getElementById('driver-submit-btn').innerText = "Zapisz zmiany";
+            document.getElementById('driver-cancel-btn').style.display = "inline-block";
+            document.getElementById('driver-form').scrollIntoView({behavior: 'smooth'});
+        }
+    }
+
+    function cancelDriverEdit() {
+        document.getElementById('driver-edit-id').value = "";
+        document.getElementById('driver-form').reset();
+        document.getElementById('driver-form-title').innerText = "Dodaj lub Edytuj termin kierowcy";
+        document.getElementById('driver-submit-btn').innerText = "Zapisz kierowcę";
+        document.getElementById('driver-cancel-btn').style.display = "none";
+    }
+
+    function deleteDriver(id) {
+        if(confirm("Usunąć ten wpis?")) {
+            driversData = driversData.filter(item => item.id !== id);
+            localStorage.setItem('driversData', JSON.stringify(driversData));
+            renderTables();
+        }
+    }
+
+    // --- RENDEROWANIE PANELI ---
+    function renderTables() {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        // 1. Renderowanie Floty i Serwisu
+        const fleetContainer = document.getElementById('vehicles-container');
+        fleetContainer.innerHTML = '';
+        const fleetGroups = {};
+        fleetData.forEach(item => {
+            if (!fleetGroups[item.plate]) fleetGroups[item.plate] = [];
+            fleetGroups[item.plate].push(item);
+        });
+
+        Object.keys(fleetGroups).sort().forEach(plate => {
+            const items = fleetGroups[plate];
+            items.sort((a,b) => new Date(a.date) - new Date(b.date));
+            const sData = serviceData[plate] || { mileage: '', oilDate: '', repairs: [] };
+
+            const card = document.createElement('div');
+            card.className = 'card vehicle-card';
+            
+            let html = `<h2>🚚 Pojazd: ${plate}</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>Rodzaj badania</th><th>Data ważności</th><th>Dni</th><th>Status</th><th>Akcje</th></tr></thead>
+                    <tbody>`;
+            
+            items.forEach(item => {
+                const diffDays = Math.ceil((new Date(item.date) - today) / (1000 * 60 * 60 * 24));
+                let badge = '';
+                if (diffDays < 0) badge = `<span class="badge badge-danger">PO TERMINIE! (${Math.abs(diffDays)})</span>`;
+                else if (diffDays <= 7) badge = `<span class="badge badge-danger">KRYTYCZNIE! (Zostało ${diffDays} dni)</span>`;
+                else if (diffDays <= 30) badge = `<span class="badge badge-warning">Ostrzeżenie (Zostało ${diffDays} dni)</span>`;
+                else badge = `<span class="badge badge-success">OK (${diffDays})</span>`;
+
+                html += `<tr><td><strong>${item.type}</strong></td><td>${item.date}</td><td>${diffDays < 0 ? '---' : diffDays}</td><td>${badge}</td><td><button class="btn-edit" onclick="editItem(${item.id})">Edytuj</button><button class="btn-delete" onclick="deleteItem(${item.id})">Usuń</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+
+            // HTML Sekcji eksploatacyjnej
+            html += `
+            <div class="service-box">
+                <h4>🔧 Stan techniczny i Eksploatacja</h4>
+                <div class="form-grid">
+                    <div>
+                        <label>Aktualny przebieg (km)</label>
+                        <input type="number" id="mileage-${plate}" value="${sData.mileage || ''}" placeholder="np. 420000">
+                    </div>
+                    <div>
+                        <label>Ostatnia wymiana oleju</label>
+                        <input type="date" id="oil-${plate}" value="${sData.oilDate || ''}">
+                    </div>
+                    <div style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn-primary" onclick="saveService('${plate}')">💾 Zapisz stan</button>
+                    </div>
+                </div>
+                
+                <h5 style="margin: 15px 0 5px 0;">🛠️ Zgłoś nową naprawę / serwis:</h5>
+                <div class="form-grid">
+                    <input type="date" id="rep-date-${plate}" style="padding:5px;">
+                    <input type="number" id="rep-mil-${plate}" placeholder="Przebieg km" style="padding:5px;">
+                    <input type="text" id="rep-desc-${plate}" placeholder="Opis naprawy" style="padding:5px;">
+                    <button type="button" class="btn-success" onclick="addRepair('${plate}')" style="padding:5px 10px;">➕ Dodaj naprawę</button>
+                </div>
+
+                <h5 style="margin: 15px 0 5px 0;">📋 Historia napraw:</h5>
+                <ul class="repair-list">
+                    ${sData.repairs && sData.repairs.length > 0 ? sData.repairs.map(r => `<li>📅 <strong>${r.date}</strong> [${r.mileage ? r.mileage + ' km' : '---'}] - ${r.desc}</li>`).reverse().join('') : '<li>Brak zarejestrowanych napraw.</li>'}
+                </ul>
+            </div>`;
+
+            card.innerHTML = html;
+            fleetContainer.appendChild(card);
+        });
+
+        // 2. Renderowanie Kierowców
+        const driversContainer = document.getElementById('drivers-container');
+        driversContainer.innerHTML = '';
+        const driverGroups = {};
+        driversData.forEach(item => {
+            if (!driverGroups[item.name]) driverGroups[item.name] = [];
+            driverGroups[item.name].push(item);
+        });
+
+        Object.keys(driverGroups).sort().forEach(name => {
+            const items = driverGroups[name];
+            items.sort((a,b) => new Date(a.date) - new Date(b.date));
+            const card = document.createElement('div');
+            card.className = 'card driver-card';
+            
+            let html = `<h2>🪪 Kierowca: ${name}</h2><div style="overflow-x:auto;"><table><thead><tr><th>Rodzaj umowy / dokumentu</th><th>Data ważności</th><th>Dni</th><th>Status</th><th>Akcje</th></tr></thead><tbody>`;
+            items.forEach(item => {
+                const diffDays = Math.ceil((new Date(item.date) - today) / (1000 * 60 * 60 * 24));
+                let badge = '';
+                if (diffDays < 0) badge = `<span class="badge badge-danger">PO TERMINIE! (${Math.abs(diffDays)})</span>`;
+                else if (diffDays <= 7) badge = `<span class="badge badge-danger">KRYTYCZNIE! (${diffDays} dni)</span>`;
+                else if (diffDays <= 30) badge = `<span class="badge badge-warning">Ostrzeżenie (${diffDays} dni)</span>`;
+                else badge = `<span class="badge badge-success">OK (${diffDays})</span>`;
+
+                html += `<tr><td><strong>${item.type}</strong></td><td>${item.date}</td><td>${diffDays < 0 ? '---' : diffDays}</td><td>${badge}</td><td><button class="btn-edit" onclick="editDriver(${item.id})">Edytuj</button><button class="btn-delete" onclick="deleteDriver(${item.id})">Usuń</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+            card.innerHTML = html;
+            driversContainer.appendChild(card);
+        });
+    }
+
+    // --- ALERTY E-MAIL ---
+    function checkAlerts(forceEmail = false) {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        let alerts = [];
+
+        function processItem(item, label, name) {
+            if (!item.date) return;
+            const diffDays = Math.ceil((new Date(item.date) - today) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) {
+                alerts.push(`🚨 ALARM! PO TERMINIE: [${label}] ${name} -> ${item.type} minęło o ${Math.abs(diffDays)} dni! (${item.date})`);
+            } else if (diffDays <= 7) {
+                alerts.push(`⚠️ PILNE (7 DNI): [${label}] ${name} -> ${item.type} kończy się za ${diffDays} dni!! (${item.date})`);
+            } else if (diffDays <= 30) {
+                alerts.push(`ℹ️ OSTRZEŻENIE (30 DNI): [${label}] ${name} -> ${item.type} kończy się za ${diffDays} dni. (${item.date})`);
+            }
+        }
+
+        fleetData.forEach(item => processItem(item, "FLOTA", item.plate));
+        driversData.forEach(item => processItem(item, "KIEROWCY", item.name));
+
+        if (alerts.length > 0) {
+            if(!forceEmail) alert("⚠️ Wykryto zbliżające się terminy ważności (30 lub 7 dni). Sprawdź szczegóły.");
+
+            const pubKey = localStorage.getItem('el_pub');
+            const srvId = localStorage.getItem('el_srv');
+            const tmpId = localStorage.getItem('el_tmp');
+
+            if(pubKey && srvId && tmpId) {
+                emailjs.init(pubKey);
+                emailjs.send(srvId, tmpId, {
+                    message: alerts.join("\n"),
+                    to_email: "atomix1298@gmail.com"
+                }).then(() => {
+                    alert("📧 Raport o terminach (30 / 7 dni) wysłany na atomix1298@gmail.com!");
+                }, (err) => {
+                    alert("❌ Błąd maila: " + JSON.stringify(err));
+                });
+            } else if (forceEmail) {
+                alert("❌ Uzupełnij najpierw klucze EmailJS na górze strony.");
+            }
+        }
+    }
+
+    renderTables();
+    setTimeout(() => { checkAlerts(false); }, 1000);
+</script>
+</body>
+</html>
