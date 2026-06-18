@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zarządzanie Flotą i Kierowcami - Serwiss</title>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <!-- DOŁĄCZENIE BIBLIOTEK GOOGLE FIREBASE -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
@@ -53,12 +56,15 @@
         .alert-box { background: #fadbd8; border-left: 5px solid #e74c3c; padding: 15px; margin-bottom: 20px; border-radius: 4px; color: #78281f; font-weight: bold; display: none; }
         .service-box { background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; margin-top: 15px; border-radius: 6px; }
         .repair-list { font-size: 13px; margin-top: 10px; padding-left: 20px; }
+        .loading-overlay { background: rgba(255,255,255,0.8); position: fixed; top:0; left:0; width:100%; height:100%; display:flex; justify-content:center; align-items:center; font-size:24px; font-weight:bold; z-index:9999; }
     </style>
 </head>
 <body>
 
+<div id="loading" class="loading-overlay">⏳ Pobieranie aktualnych danych z chmury Firebase...</div>
+
 <div class="container">
-    <h1>🚛 Panel Dowodzenia - Firma Transportowa</h1>
+    <h1>🚛 Panel Dowodzenia - Firma Transportowa (Chmura Online)</h1>
     
     <!-- AUTOMATYCZNE PRZYPOMNIENIA URZĘDOWE -->
     <div id="gitd-alert" class="alert-box">
@@ -121,6 +127,7 @@
                             <option value="Ubezpieczenie OC">Ubezpieczenie OC</option>
                             <option value="Badanie UDT">Badanie UDT</option>
                             <option value="Legalizacja Tacho">Legalizacja Tacho</option>
+                            <option value="Pobranie danych z Tacho (90 dni)">Pobranie danych z Tacho (90 dni)</option>
                             <option value="Gaśnica / BHP">Gaśnica / BHP</option>
                         </select>
                     </div>
@@ -155,6 +162,7 @@
                             <option value="Badania lekarskie i psychotesty">Badania lekarskie i psychotesty</option>
                             <option value="Prawo jazdy / Kod 95">Prawo jazdy / Kod 95</option>
                             <option value="Karta kierowcy">Karta kierowcy</option>
+                            <option value="Odczyt karty kierowcy (28 dni)">Odczyt karty kierowcy (28 dni)</option>
                         </select>
                     </div>
                     <div>
@@ -204,30 +212,42 @@
 </div>
 
 <script>
-    // Bazy danych startowe pojazdów
-    const initialFleetData = [
+    // --- KONFIGURACJA GOOGLE FIREBASE CHMURY ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCz9zDMKT8RCh88hLSGVJXHLBDthjmQYXs",
+        authDomain: "flota-1b21b.firebaseapp.com",
+        databaseURL: "https://flota-1b21b-default-rtdb.europe-west1.firebasedatabase.app/",
+        projectId: "flota-1b21b"
+    };
+    
+    // Inicjalizacja bazy
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Bazy danych startowe (wczytają się do Firebase TYLKO jeśli baza w internecie będzie pusta)
+    const defaultFleetData = [
         { id: 1, plate: "Man Tgl GKA 63156", type: "Przegląd rejestracyjny", date: "2027-01-31" },
         { id: 2, plate: "Man Tgl GKA 63156", type: "Ubezpieczenie OC", date: "2027-03-06" },
         { id: 3, plate: "Man Tgl GKA 63156", type: "Badanie UDT", date: "2026-05-31" },
         { id: 4, plate: "Man Tgl GKA 63156", type: "Legalizacja Tacho", date: "2028-02-27" },
         { id: 5, plate: "Man Tgl Ezg24Y7", type: "Przegląd rejestracyjny", date: "2026-06-27" },
-        { id: 6, plate: "Man Tgl Ezg24Y7", type: "Ubezpieczenie OC", date: "2026-01-05" },
+        { id: 6, plate: "Man Tgl Ezg24Y7", type: "Ubezpieczenie OC", date: "2027-01-05" },
         { id: 7, plate: "Man Tgl Ezg24Y7", type: "Legalizacja Tacho", date: "2027-03-28" },
         { id: 8, plate: "Daf FA LF 45 NEL13K3", type: "Przegląd rejestracyjny", date: "2026-11-14" },
         { id: 9, plate: "Daf FA LF 45 NEL13K3", type: "Ubezpieczenie OC", date: "2026-11-17" },
         { id: 10, plate: "Daf FA LF 45 NEL13K3", type: "Badanie UDT", date: "2028-11-30" },
         { id: 11, plate: "Daf FA LF 45 NEL13K3", type: "Legalizacja Tacho", date: "2028-04-01" },
-        { id: 12, plate: "Man Tgl GKA 94779", type: "Przegląd rejestracyjny", date: "2026-04-16" },
-        { id: 13, plate: "Man Tgl GKA 94779", type: "Ubezpieczenie OC", date: "2026-04-16" },
+        { id: 12, plate: "Man Tgl GKA 94779", type: "Przegląd rejestracyjny", date: "2027-04-07" },
+        { id: 13, plate: "Man Tgl GKA 94779", type: "Ubezpieczenie OC", date: "2027-04-19" },
         { id: 14, plate: "Man Tgl GKA 94779", type: "Badanie UDT", date: "2028-05-31" },
-        { id: 15, plate: "Man Tgl GKA 94779", type: "Legalizacja Tacho", date: "2026-04-18" },
+        { id: 15, plate: "Man Tgl GKA 94779", type: "Legalizacja Tacho", date: "2028-04-07" },
         { id: 16, plate: "Man Tgl ETM 28614", type: "Przegląd rejestracyjny", date: "2026-07-30" },
         { id: 17, plate: "Man Tgl ETM 28614", type: "Ubezpieczenie OC", date: "2026-11-26" },
         { id: 18, plate: "Man Tgl ETM 28614", type: "Legalizacja Tacho", date: "2028-05-07" },
         { id: 19, plate: "Man Tgl ETM 28614", type: "Badanie UDT", date: "2026-05-31" }
     ];
 
-    const initialDriversData = [
+    const defaultDriversData = [
         { id: 201, name: "Ivan", type: "Umowa o pracę / zlecenie", date: "2026-12-31" },
         { id: 202, name: "Kamil Piekarski", type: "Umowa o pracę / zlecenie", date: "2027-05-09" },
         { id: 203, name: "Kamil Piekarski", type: "Prawo jazdy / Kod 95", date: "2028-08-30" },
@@ -242,25 +262,47 @@
         { id: 212, name: "Leszek Rychert", type: "Karta kierowcy", date: "2031-03-31" }
     ];
 
-    const initialFinanceData = [
-        { id: 301, name: "Ubezpieczenie OCP Przewoźnika", date: "2027-02-15" },
-        { id: 302, name: "Zabezpieczenie finansowe do licencji (GITD)", date: "2027-04-30" }
+    const defaultFinanceData = [
+        { id: 301, name: "Zabezpieczenie finansowe do licencji (GITD)", date: "2026-07-01" },
+        { id: 302, name: "Ubezpieczenie OCP Przewoźnika", date: "2027-06-07" }
     ];
 
-    // Inicjalizacja LocalStorage
-    if (!localStorage.getItem('fleetData')) localStorage.setItem('fleetData', JSON.stringify(initialFleetData));
-    if (!localStorage.getItem('driversData')) localStorage.setItem('driversData', JSON.stringify(initialDriversData));
-    if (!localStorage.getItem('financeData')) localStorage.setItem('financeData', JSON.stringify(initialFinanceData));
-    if (!localStorage.getItem('serviceData')) localStorage.setItem('serviceData', JSON.stringify({}));
+    let fleetData = [];
+    let driversData = [];
+    let financeData = [];
+    let serviceData = {};
 
-    let fleetData = JSON.parse(localStorage.getItem('fleetData'));
-    let driversData = JSON.parse(localStorage.getItem('driversData'));
-    let financeData = JSON.parse(localStorage.getItem('financeData'));
-    let serviceData = JSON.parse(localStorage.getItem('serviceData'));
+    // --- PODPIĘCIE NASŁUCHIWANIA CHMURY NA ŻYWO ---
+    db.ref().on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        
+        // Jeśli baza w internecie jest pusta, załaduj dane domyślne na sztywno
+        if (!data.fleetData) {
+            db.ref().set({
+                fleetData: defaultFleetData,
+                driversData: defaultDriversData,
+                financeData: defaultFinanceData,
+                serviceData: {},
+                el_pub: localStorage.getItem('el_pub') || '',
+                el_srv: localStorage.getItem('el_srv') || '',
+                el_tmp: localStorage.getItem('el_tmp') || ''
+            });
+            return;
+        }
 
-    document.getElementById('emailjs-public').value = localStorage.getItem('el_pub') || '';
-    document.getElementById('emailjs-service').value = localStorage.getItem('el_srv') || '';
-    document.getElementById('emailjs-template').value = localStorage.getItem('el_tmp') || '';
+        fleetData = data.fleetData || [];
+        driversData = data.driversData || [];
+        financeData = data.financeData || [];
+        serviceData = data.serviceData || {};
+
+        document.getElementById('emailjs-public').value = data.el_pub || '';
+        document.getElementById('emailjs-service').value = data.el_srv || '';
+        document.getElementById('emailjs-template').value = data.el_tmp || '';
+
+        // Ukryj komunikat ładowania i odśwież widok
+        document.getElementById('loading').style.display = 'none';
+        renderTables();
+    });
 
     function switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -278,12 +320,12 @@
     }
 
     function saveConfig() {
-        localStorage.setItem('el_pub', document.getElementById('emailjs-public').value);
-        localStorage.setItem('el_srv', document.getElementById('emailjs-service').value);
-        localStorage.setItem('el_tmp', document.getElementById('emailjs-template').value);
+        db.ref('el_pub').set(document.getElementById('emailjs-public').value);
+        db.ref('el_srv').set(document.getElementById('emailjs-service').value);
+        db.ref('el_tmp').set(document.getElementById('emailjs-template').value);
     }
 
-    // --- FUNKCJA WYLICZANIA PRZEBIEGU URZĘDOWO-WIRTUALNEGO (KILOMETRY OLEJU) ---
+    // --- AUTOMATYCZNY KALKULATOR OLEJU ---
     function calculateVirtualMileage(sData) {
         if (!sData.mileage || !sData.saveDate) return { current: null, oilLeft: null };
         
@@ -319,7 +361,7 @@
         return { current: Math.round(calculatedCurrent), oilLeft: oilLeft ? Math.round(oilLeft) : null };
     }
 
-    // --- LOGIKA POJAZDÓW ---
+    // --- LOGIKA POJAZDÓW (ZAPIS DO FIREBASE) ---
     document.getElementById('vehicle-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const editId = document.getElementById('edit-id').value;
@@ -333,9 +375,8 @@
         } else {
             fleetData.push({ id: Date.now(), plate, type, date });
         }
-        localStorage.setItem('fleetData', JSON.stringify(fleetData));
+        db.ref('fleetData').set(fleetData);
         document.getElementById('vehicle-form').reset();
-        renderTables();
     });
 
     function editItem(id) {
@@ -363,12 +404,11 @@
     function deleteItem(id) {
         if(confirm("Usunąć ten termin?")) {
             fleetData = fleetData.filter(item => item.id !== id);
-            localStorage.setItem('fleetData', JSON.stringify(fleetData));
-            renderTables();
+            db.ref('fleetData').set(fleetData);
         }
     }
 
-    // --- EKSPLOATACJA I SERWIS ---
+    // --- EKSPLOATACJA I SERWIS (CHMURA) ---
     function saveService(plate) {
         if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', oilMileage: '', dailyKm: '200', workDaysOnly: true, saveDate: '', repairs: [] };
         
@@ -379,9 +419,8 @@
         serviceData[plate].workDaysOnly = document.getElementById(`workdays-${plate}`).checked;
         serviceData[plate].saveDate = new Date().toISOString().split('T')[0];
 
-        localStorage.setItem('serviceData', JSON.stringify(serviceData));
-        alert("Zapisano konfigurację eksploatacyjną dla " + plate + ". Przebieg będzie rósł automatycznie.");
-        renderTables();
+        db.ref('serviceData').set(serviceData);
+        alert("Zapisano konfigurację eksploatacyjną w chmurze dla " + plate);
     }
 
     function addRepair(plate) {
@@ -392,16 +431,17 @@
         if(!date || !desc) { alert("Wpisz datę i opis naprawy!"); return; }
 
         if (!serviceData[plate]) serviceData[plate] = { mileage: '', oilDate: '', oilMileage: '', dailyKm: '200', workDaysOnly: true, saveDate: '', repairs: [] };
+        if (!serviceData[plate].repairs) serviceData[plate].repairs = [];
+        
         serviceData[plate].repairs.push({ date, mileage, desc });
-        localStorage.setItem('serviceData', JSON.stringify(serviceData));
+        db.ref('serviceData').set(serviceData);
         
         document.getElementById(`rep-date-${plate}`).value = '';
         document.getElementById(`rep-mil-${plate}`).value = '';
         document.getElementById(`rep-desc-${plate}`).value = '';
-        renderTables();
     }
 
-    // --- LOGIKA KIEROWCÓW ---
+    // --- LOGIKA KIEROWCÓW (CHMURA) ---
     document.getElementById('driver-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const editId = document.getElementById('driver-edit-id').value;
@@ -415,9 +455,8 @@
         } else {
             driversData.push({ id: Date.now(), name, type, date });
         }
-        localStorage.setItem('driversData', JSON.stringify(driversData));
+        db.ref('driversData').set(driversData);
         document.getElementById('driver-form').reset();
-        renderTables();
     });
 
     function editDriver(id) {
@@ -445,12 +484,11 @@
     function deleteDriver(id) {
         if(confirm("Usunąć ten wpis?")) {
             driversData = driversData.filter(item => item.id !== id);
-            localStorage.setItem('driversData', JSON.stringify(driversData));
-            renderTables();
+            db.ref('driversData').set(driversData);
         }
     }
 
-    // --- LOGIKA FINANSÓW / FIRMY ---
+    // --- LOGIKA FINANSÓW / FIRMY (CHMURA) ---
     document.getElementById('finance-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const editId = document.getElementById('finance-edit-id').value;
@@ -463,9 +501,8 @@
         } else {
             financeData.push({ id: Date.now(), name, date });
         }
-        localStorage.setItem('financeData', JSON.stringify(financeData));
+        db.ref('financeData').set(financeData);
         document.getElementById('finance-form').reset();
-        renderTables();
     });
 
     function editFinance(id) {
@@ -492,22 +529,20 @@
     function deleteFinance(id) {
         if(confirm("Usunąć to zobowiązanie?")) {
             financeData = financeData.filter(item => item.id !== id);
-            localStorage.setItem('financeData', JSON.stringify(financeData));
-            renderTables();
+            db.ref('financeData').set(financeData);
         }
     }
 
-    // --- RENDEROWANIE PANELI ---
+    // --- RENDEROWANIE PANELI STRONY ---
     function renderTables() {
         const today = new Date();
         today.setHours(0,0,0,0);
 
-        // Pokazywanie powiadomienia GITD na początku roku (Styczeń = miesiąc 0, Luty = miesiąc 1)
         if(today.getMonth() === 0 || today.getMonth() === 1) {
             document.getElementById('gitd-alert').style.display = 'block';
         }
 
-        // 1. Renderowanie Floty i Serwisu
+        // 1. Flota i Serwis
         const fleetContainer = document.getElementById('vehicles-container');
         fleetContainer.innerHTML = '';
         const fleetGroups = {};
@@ -528,7 +563,6 @@
             
             let html = `<h2>🚚 Pojazd: ${plate}</h2>`;
             
-            // System powiadomień o wymianie oleju
             if (vData.oilLeft !== null) {
                 if (vData.oilLeft <= 0) {
                     html += `<div style="background:#f2d7d5; border: 2px solid #c0392b; padding:10px; margin-bottom:10px; border-radius:5px; color:#922b21; font-weight:bold;">🚨 KRYTYCZNA WYMIANA OLEJU! Przekroczono limit 40 000 km o: ${Math.abs(vData.oilLeft)} km!</div>`;
@@ -557,7 +591,6 @@
             });
             html += `</tbody></table></div>`;
 
-            // HTML Sekcji eksploatacyjnej
             html += `
             <div class="service-box">
                 <h4>🔧 Stan techniczny i Automatyczny kalkulator oleju</h4>
@@ -604,7 +637,7 @@
             fleetContainer.appendChild(card);
         });
 
-        // 2. Renderowanie Kierowców
+        // 2. Kierowcy
         const driversContainer = document.getElementById('drivers-container');
         driversContainer.innerHTML = '';
         const driverGroups = {};
@@ -635,7 +668,7 @@
             driversContainer.appendChild(card);
         });
 
-        // 3. Renderowanie Finansów
+        // 3. Finanse
         const financeTbody = document.getElementById('finance-tbody');
         financeTbody.innerHTML = '';
         financeData.sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -661,21 +694,13 @@
         });
     }
 
-    // --- SYSTEM KOPII ZAPASOWYCH (EXPORT / IMPORT PLIKU JSON) ---
+    // --- KOPIE ZAPASOWE (EXPORT / IMPORT JSON Z CHMURY) ---
     function exportData() {
-        const fullBackup = {
-            fleetData: JSON.parse(localStorage.getItem('fleetData')),
-            driversData: JSON.parse(localStorage.getItem('driversData')),
-            financeData: JSON.parse(localStorage.getItem('financeData')),
-            serviceData: JSON.parse(localStorage.getItem('serviceData')),
-            el_pub: localStorage.getItem('el_pub'),
-            el_srv: localStorage.getItem('el_srv'),
-            el_tmp: localStorage.getItem('el_tmp')
-        };
+        const fullBackup = { fleetData, driversData, financeData, serviceData };
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup));
         const downloadAnchor = document.createElement('a');
         downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `KOPIA_FLOTA_${new Date().toISOString().split('T')[0]}.json`);
+        downloadAnchor.setAttribute("download", `KOPIA_CHMURA_FLOTA_${new Date().toISOString().split('T')[0]}.json`);
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
@@ -688,18 +713,13 @@
         reader.onload = function(e) {
             try {
                 const imported = JSON.parse(e.target.result);
-                if (imported.fleetData) localStorage.setItem('fleetData', JSON.stringify(imported.fleetData));
-                if (imported.driversData) localStorage.setItem('driversData', JSON.stringify(imported.driversData));
-                if (imported.financeData) localStorage.setItem('financeData', JSON.stringify(imported.financeData));
-                if (imported.serviceData) localStorage.setItem('serviceData', JSON.stringify(imported.serviceData));
-                if (imported.el_pub) localStorage.setItem('el_pub', imported.el_pub);
-                if (imported.el_srv) localStorage.setItem('el_srv', imported.el_srv);
-                if (imported.el_tmp) localStorage.setItem('el_tmp', imported.el_tmp);
-                
-                alert("🚀 Kopia zapasowa wgrana pomyślnie! Strona za chwilę się odświeży.");
-                window.location.reload();
+                if (imported.fleetData) db.ref('fleetData').set(imported.fleetData);
+                if (imported.driversData) db.ref('driversData').set(imported.driversData);
+                if (imported.financeData) db.ref('financeData').set(imported.financeData);
+                if (imported.serviceData) db.ref('serviceData').set(imported.serviceData);
+                alert("🚀 Kopia zapasowa przesłana do chmury Firebase!");
             } catch (err) {
-                alert("❌ Błąd! Wybrałeś nieprawidłowy plik kopii zapasowej.");
+                alert("❌ Błąd! Nieprawidłowy plik kopii zapasowej.");
             }
         };
         reader.readAsText(file);
@@ -727,7 +747,6 @@
         driversData.forEach(item => processItem(item, "KIEROWCY", item.name));
         financeData.forEach(item => processItem(item, "FINANSE", item.name));
 
-        // Dodanie alertów o olejach do maila
         Object.keys(serviceData).forEach(plate => {
             const vData = calculateVirtualMileage(serviceData[plate]);
             if (vData.oilLeft !== null) {
@@ -742,28 +761,30 @@
         if (alerts.length > 0) {
             if(!forceEmail) alert("⚠️ Wykryto zbliżające się terminy ważności lub wymiany oleju. Sprawdź szczegóły.");
 
-            const pubKey = localStorage.getItem('el_pub');
-            const srvId = localStorage.getItem('el_srv');
-            const tmpId = localStorage.getItem('el_tmp');
+            db.ref().once('value').then((snapshot) => {
+                const data = snapshot.val() || {};
+                const pubKey = data.el_pub;
+                const srvId = data.el_srv;
+                const tmpId = data.el_tmp;
 
-            if(pubKey && srvId && tmpId) {
-                emailjs.init(pubKey);
-                emailjs.send(srvId, tmpId, {
-                    message: alerts.join("\n"),
-                    to_email: "atomix1298@gmail.com"
-                }).then(() => {
-                    alert("📧 Raport o terminach wysłany na atomix1298@gmail.com!");
-                }, (err) => {
-                    alert("❌ Błąd maila: " + JSON.stringify(err));
-                });
-            } else if (forceEmail) {
-                alert("❌ Uzupełnij najpierw klucze EmailsJS na górze strony.");
-            }
+                if(pubKey && srvId && tmpId) {
+                    emailjs.init(pubKey);
+                    emailjs.send(srvId, tmpId, {
+                        message: alerts.join("\n"),
+                        to_email: "atomix1298@gmail.com"
+                    }).then(() => {
+                        alert("📧 Raport o terminach wysłany na atomix1298@gmail.com!");
+                    }, (err) => {
+                        alert("❌ Błąd maila: " + JSON.stringify(err));
+                    });
+                } else if (forceEmail) {
+                    alert("❌ Uzupełnij najpierw klucze EmailsJS na górze strony.");
+                }
+            });
         }
     }
 
-    renderTables();
-    setTimeout(() => { checkAlerts(false); }, 1000);
+    setTimeout(() => { checkAlerts(false); }, 2000);
 </script>
 </body>
 </html>
